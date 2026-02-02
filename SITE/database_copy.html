@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Supabase Копирование ВСЕЙ базы</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <style>
+    body { background: #222; color: #eee; font-family: sans-serif; padding: 40px; }
+    label { display: inline-block; width:120px; }
+    input[type=text] { width: 440px; }
+    textarea { width: 100%; min-height: 110px; background: #191919; color: #fff; }
+    button { padding: 10px 30px; font-size: 1.1em; margin: 16px 0; }
+    .log { font-size: 0.97em; background: #222; margin: 1em 0 0 0; padding: 10px; border-radius: 8px; border:1px solid #333; }
+    .warn { color: #f8d277; }
+    .err { color: #e26666; }
+    .ok { color: #6fc693; }
+  </style>
+</head>
+<body>
+  <h2>Supabase: Копирование всей базы</h2>
+  <form id="settingsForm" onsubmit="return false;">
+    <div>
+      <label>🛡️ Prod URL:</label>
+      <input type="text" id="prod_url" required placeholder="https://xxxxx.supabase.co">
+    </div>
+    <div>
+      <label>🔑 Prod SVC Key:</label>
+      <input type="text" id="prod_key" required placeholder="SERVICE_ROLE_KEY" autocomplete="off">
+    </div>
+    <div>
+      <label>🛡️ Local URL:</label>
+      <input type="text" id="local_url" value="http://localhost:54321" required>
+    </div>
+    <div>
+      <label>🔑 Local SVC Key:</label>
+      <input type="text" id="local_key" required placeholder="SERVICE_ROLE_KEY локалки" autocomplete="off">
+    </div>
+    <div>
+      <label>Таблицы (через ,):</label>
+      <input type="text" id="tables" value="styles,phenomena,projects,authors,features,media_assets,reference_entries,reference_author,phenomenon_style,project_author,project_feature,project_media,project_style,style_reference">
+    </div>
+    <button id="btnCopy">Копировать ВСЁ</button>
+  </form>
+  <div class="log" id="log">Журнал событий появится здесь.</div>
+  <script>
+    async function copyTables() {
+      const prodUrl = document.getElementById('prod_url').value.trim();
+      const prodKey = document.getElementById('prod_key').value.trim();
+      const localUrl = document.getElementById('local_url').value.trim();
+      const localKey = document.getElementById('local_key').value.trim();
+      const tablesRaw = document.getElementById('tables').value.trim();
+      const tables = tablesRaw.split(',').map(x => x.trim()).filter(Boolean);
+      const logArea = document.getElementById('log');
+      logArea.innerHTML = "Инициализация клиентов…<br>";
+
+      if (!prodUrl || !prodKey || !localUrl || !localKey || !tables.length) {
+        logArea.innerHTML = "<span class=err>Заполните все поля!</span>";
+        return;
+      }
+      try {
+        const prod = supabase.createClient(prodUrl, prodKey, { auth: { persistSession: false } });
+        const local = supabase.createClient(localUrl, localKey, { auth: { persistSession: false } });
+
+        for (let table of tables) {
+          logArea.innerHTML += `<br>📥 <b>${table}</b>: читаем…`;
+          let { data, error } = await prod.from(table).select('*');
+          if (error) {
+            logArea.innerHTML += `<br><span class=warn>‣ Таблица "${table}": ошибка чтения: ${error.message}</span>`;
+            continue;
+          }
+          logArea.innerHTML += ` Получено: ${data.length}. Копируем…`;
+          // Батч-загрузка (чтобы не было слишком больших запросов)
+          let total = data.length, batch = 500, index = 0;
+          while (index < total) {
+            const chunk = data.slice(index, index + batch);
+            let { error: insertErr } = await local.from(table).upsert(chunk, { onConflict: 'id' });
+            if (insertErr) {
+              logArea.innerHTML += `<br><span class=err>‣ Ошибка upsert для "${table}": ${insertErr.message}</span>`;
+              break;
+            }
+            index += batch;
+          }
+          logArea.innerHTML += `<span class=ok> OK</span>`;
+        }
+        logArea.innerHTML += "<br><b class=ok>Готово!</b>";
+      } catch (err) {
+        logArea.innerHTML += `<br><span class=err>‣ Глобальная ошибка: ${err.message}</span>`;
+      }
+    }
+
+    document.getElementById('btnCopy').onclick = () => {
+      copyTables();
+      return false;
+    }
+  </script>
+</body>
+</html>
