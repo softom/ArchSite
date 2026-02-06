@@ -1,0 +1,17 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../../WORK ON SERVER/services"
+		},
+		{
+			"path": "../../WORK ON SERVER/site"
+		},
+		{
+			"path": "../../WORK ON SERVER/supabase"
+		}
+	],
+	"settings": {}
+}

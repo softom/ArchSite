@@ -1,0 +1,51 @@
+Сводка: где мы сейчас (что уже сделано и работает)
+Инфраструктура / домены / HTTPS
+Сервер: Selectel, IP 178.72.152.16.
+DNS: домен 2vhutemas.ru и поддомены указывают на сервер; api.2vhutemas.ru используется для API.
+Caddy установлен как systemd-сервис, сертификаты Let’s Encrypt получены, 443 работает.
+https://2vhutemas.ru отдаёт статический сайт из /var/www/2vhutemas (тестовая страница “OK” видна с рабочей станции).
+https://api.2vhutemas.ru проксирует на Kong.
+Supabase self-host (docker-compose)
+Контейнеры подняты и работают:
+- supa_db (postgres supabase image)
+- supa_auth (gotrue)
+- supa_rest (postgrest)
+- supa_storage (storage-api)
+- supa_kong (gateway)
+
+Kong
+Declarative config kong.yml настроен на маршруты:
+/auth/v1 → auth:9999
+/rest/v1 → rest:3000
+/storage/v1 → storage:5000
+Ключевой фикс: strip_path: true, иначе upstream получал /auth/v1/... и отвечал 404.
+Безопасность портов
+Kong admin (8001) наружу убран.
+Kong proxy (8000) привязан на localhost: 127.0.0.1:8000:8000 (доступ только через Caddy/443).
+Ключи/JWT
+В .env были заглушки anon_placeholder/service_placeholder, мы сгенерировали реальные JWT-ключи.
+Админские запросы к GoTrue работают при условии, что в shell подгружены переменные (set -a; source .env; set +a) и используется apikey+Authorization.
+Auth / роли / PostgREST
+Была проблема: PostgREST отвечал role "" does not exist — потому что у пользователя в auth.users.role было пусто.
+Исправили в БД:
+ALTER TABLE auth.users ALTER COLUMN role SET DEFAULT 'authenticated';
+UPDATE auth.users SET role='authenticated' WHERE role IS NULL OR role='';
+После получения нового access_token в JWT стало role=authenticated, и PostgREST начал принимать запросы.
+RLS (проверено “вживую”)
+Создана таблица public.profiles (id uuid FK → auth.users(id)), RLS включён.
+Политики:
+user SELECT/INSERT/UPDATE только по auth.uid() = id
+service_role имеет ALL (через claim role).
+Проверка: user смог вставить свой профиль и видит только его.
+Что осталось / следующий этап
+1) Решить структуру web-проекта на сервере (статик/SPA, git-deploy, сборка).
+2) Миграция данных со старого Supabase (уточнить: public-схема? auth.users? storage и файлы?).
+3) Бэкапы/restore план для Postgres + storage_data.
+4) (Опционально) привести SITE_URL/API_EXTERNAL_URL к финальной схеме: сайт на 2vhutemas.ru, API на api.2vhutemas.ru (важно для редиректов/magic links).
+
+Основные файлы настройки лежат в каталоге
+opt\2vhutemas
+
+Web сервер лежит в папкх
+var\www
+
