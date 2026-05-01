@@ -1,0 +1,6 @@
+# Локальные настройки Claude Code (settings.local.json привязан к машине)
+.claude/
+
+# Временные файлы
+*.tmp
+*.log
