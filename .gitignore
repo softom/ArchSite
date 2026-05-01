@@ -1,6 +1,25 @@
 # Локальные настройки Claude Code (settings.local.json привязан к машине)
 .claude/
 
+# Секреты — ключи Supabase, .env, и пр. (никогда не коммитить)
+.secrets/
+*.env
+*.env.local
+.env
+.env.*
+
+# Supabase CLI workdir — содержит project-ref, pooler-url и т.п.
+supabase/.temp/
+supabase/.branches/
+
+# VS Code SFTP-плагин (хранит SSH/SFTP креды, host, password)
+.vscode/sftp.json
+
+# Прочие IDE/инструменты, которые могут хранить креды
+continue.yaml
+.continue/
+.vscode/settings.json
+
 # Временные файлы
 *.tmp
 *.log
